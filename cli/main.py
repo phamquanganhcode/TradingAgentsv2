@@ -494,6 +494,26 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
 
 def get_user_selections():
     """Get all user selections before starting the analysis display."""
+    if os.environ.get("AUTO_RUN"):
+        from cli.utils import detect_asset_type
+        from cli.models import AnalystType
+        console.print("[green]Running in AUTO_RUN mode with predefined settings for XAGUSD...[/green]")
+        return {
+            "ticker": "XAGUSD",
+            "asset_type": detect_asset_type("XAGUSD").value,
+            "analysis_date": datetime.datetime.now().strftime("%Y-%m-%d"),
+            "analysts": [AnalystType.MARKET, AnalystType.SOCIAL, AnalystType.NEWS, AnalystType.FUNDAMENTALS],
+            "research_depth": 5,
+            "llm_provider": "google",
+            "backend_url": None,
+            "shallow_thinker": "gemini-3.1-flash-lite",
+            "deep_thinker": "gemini-3.1-flash-lite",
+            "google_thinking_level": None,
+            "openai_reasoning_effort": None,
+            "anthropic_effort": None,
+            "output_language": "English",
+        }
+
     # Display ASCII art welcome message
     with open(Path(__file__).parent / "static" / "welcome.txt", encoding="utf-8") as f:
         welcome_ascii = f.read()
@@ -1257,15 +1277,23 @@ def run_analysis(checkpoint: bool | None = None):
     console.print("\n[bold cyan]Analysis Complete![/bold cyan]\n")
     console.print(f"[dim]{analyst_wall_time_tracker.format_summary()}[/dim]")
 
-    # Prompt to save report
-    save_choice = typer.prompt("Save report?", default="Y").strip().upper()
-    if save_choice in ("Y", "YES", ""):
+    if os.environ.get("AUTO_RUN"):
+        save_choice = "Y"
+        display_choice = "N"
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_path = Path.cwd() / "reports" / f"{selections['ticker']}_{timestamp}"
-        save_path_str = typer.prompt(
-            "Save path (press Enter for default)",
-            default=str(default_path)
-        ).strip()
+        save_path_str = str(Path.cwd() / "reports" / f"{selections['ticker']}_{timestamp}")
+    else:
+        save_choice = typer.prompt("Save report?", default="Y").strip().upper()
+        if save_choice in ("Y", "YES", ""):
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_path = Path.cwd() / "reports" / f"{selections['ticker']}_{timestamp}"
+            save_path_str = typer.prompt(
+                "Save path (press Enter for default)",
+                default=str(default_path)
+            ).strip()
+        display_choice = typer.prompt("\nDisplay full report on screen?", default="Y").strip().upper()
+
+    if save_choice in ("Y", "YES", ""):
         save_path = Path(save_path_str)
         try:
             report_file = save_report_to_disk(final_state, selections["ticker"], save_path)
@@ -1274,8 +1302,6 @@ def run_analysis(checkpoint: bool | None = None):
         except Exception as e:
             console.print(f"[red]Error saving report: {e}[/red]")
 
-    # Prompt to display full report
-    display_choice = typer.prompt("\nDisplay full report on screen?", default="Y").strip().upper()
     if display_choice in ("Y", "YES", ""):
         display_complete_report(final_state)
 

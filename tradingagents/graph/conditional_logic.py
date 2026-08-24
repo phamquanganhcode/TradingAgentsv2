@@ -62,9 +62,11 @@ class ConditionalLogic:
 
     def should_continue_risk_analysis(self, state: AgentState) -> str:
         """Determine if risk analysis should continue."""
+        # Capped to a maximum of 1 round (1 * 3 = 3 turns) per user request
+        actual_rounds = min(self.max_risk_discuss_rounds, 1)
         if (
-            state["risk_debate_state"]["count"] >= 3 * self.max_risk_discuss_rounds
-        ):  # 3 rounds of back-and-forth between 3 agents
+            state["risk_debate_state"]["count"] >= 3 * actual_rounds
+        ):  # 3 agents per round
             return "Portfolio Manager"
         if state["risk_debate_state"]["latest_speaker"].startswith("Aggressive"):
             return "Conservative Analyst"
