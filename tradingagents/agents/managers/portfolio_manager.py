@@ -47,11 +47,14 @@ def create_portfolio_manager(llm):
 ---
 
 **Rating Scale** (use exactly one):
-- **Buy**: Strong conviction to enter or add to position
-- **Overweight**: Favorable outlook, gradually increase exposure
-- **Hold**: Maintain current position, no action needed
+- **Buy**: Strong conviction to enter or add to position (often a full position)
+- **Overweight**: Favorable outlook, gradually increase exposure (e.g. tiered entry, 20-30% initial allocation)
+- **Hold**: Maintain current position, wait for clearer signals
 - **Underweight**: Reduce exposure, take partial profits
-- **Sell**: Exit position or avoid entry
+- **Sell**: Exit position or avoid entry completely
+
+**Position Sizing & Entry Strategy Guidelines:**
+Do not be rigidly binary (all-in or all-out). If the analysts propose a "Tiered Entry" or fractional position (e.g., entering 20-25% to probe), you MUST strongly consider and integrate flexible position sizing into your final decision. If the evidence warrants it, choose "Overweight" or "Buy" with a specific fractional allocation plan instead of defaulting to a passive "Hold".
 
 **Context:**
 - Research Manager's investment plan: **{research_plan}**
@@ -62,7 +65,10 @@ def create_portfolio_manager(llm):
 
 ---
 
-Be decisive and ground every conclusion in specific evidence from the analysts.
+Be decisive, avoid rigid binary logic when fractional allocation is smarter, and ground every conclusion in specific evidence from the analysts.
+
+**Mandatory Calculation:**
+You MUST explicitly calculate the Risk/Reward ratio: R/R = (Price Target - Current Price) / (Current Price - Stop Loss). Fill the required fields and show the math in `risk_reward_calculation`.
 
 {NO_EXTERNAL_TOOLS}{get_language_instruction()}"""
 

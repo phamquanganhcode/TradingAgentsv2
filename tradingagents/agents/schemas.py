@@ -144,12 +144,19 @@ class TraderProposal(BaseModel):
         default=None,
         description="Optional stop-loss price in the instrument's quote currency.",
     )
+    price_target: float | None = Field(
+        default=None,
+        description="Optional take-profit price target in the instrument's quote currency.",
+    )
+    risk_reward_calculation: str = Field(
+        description="Mandatory calculation: R/R = (Price Target - Current Price) / (Current Price - Stop Loss). Show the exact values used and the final ratio.",
+    )
     position_sizing: str | None = Field(
         default=None,
         description="Optional sizing guidance, e.g. '5% of portfolio'.",
     )
 
-    @field_validator("entry_price", "stop_loss", mode="before")
+    @field_validator("entry_price", "stop_loss", "price_target", mode="before")
     @classmethod
     def _nullish_float_to_none(cls, v):
         return _coerce_optional_float(v)
@@ -171,6 +178,9 @@ def render_trader_proposal(proposal: TraderProposal) -> str:
         parts.extend(["", f"**Entry Price**: {proposal.entry_price}"])
     if proposal.stop_loss is not None:
         parts.extend(["", f"**Stop Loss**: {proposal.stop_loss}"])
+    if getattr(proposal, "price_target", None) is not None:
+        parts.extend(["", f"**Price Target**: {proposal.price_target}"])
+    parts.extend(["", f"**Risk/Reward**: {proposal.risk_reward_calculation}"])
     if proposal.position_sizing:
         parts.extend(["", f"**Position Sizing**: {proposal.position_sizing}"])
     parts.extend([
@@ -217,12 +227,19 @@ class PortfolioDecision(BaseModel):
         default=None,
         description="Optional target price in the instrument's quote currency.",
     )
+    stop_loss: float | None = Field(
+        default=None,
+        description="Optional stop-loss price in the instrument's quote currency.",
+    )
+    risk_reward_calculation: str = Field(
+        description="Mandatory calculation: R/R = (Price Target - Current Price) / (Current Price - Stop Loss). Show the exact values used and the final ratio.",
+    )
     time_horizon: str | None = Field(
         default=None,
         description="Optional recommended holding period, e.g. '3-6 months'.",
     )
 
-    @field_validator("price_target", mode="before")
+    @field_validator("price_target", "stop_loss", mode="before")
     @classmethod
     def _nullish_float_to_none(cls, v):
         return _coerce_optional_float(v)
@@ -245,6 +262,9 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
     ]
     if decision.price_target is not None:
         parts.extend(["", f"**Price Target**: {decision.price_target}"])
+    if getattr(decision, "stop_loss", None) is not None:
+        parts.extend(["", f"**Stop Loss**: {decision.stop_loss}"])
+    parts.extend(["", f"**Risk/Reward**: {decision.risk_reward_calculation}"])
     if decision.time_horizon:
         parts.extend(["", f"**Time Horizon**: {decision.time_horizon}"])
     return "\n".join(parts)

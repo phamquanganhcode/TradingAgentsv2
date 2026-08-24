@@ -2,6 +2,8 @@ from tradingagents.agents.utils.agent_utils import (
     get_instrument_context_from_state,
     get_language_instruction,
 )
+from tradingagents.agents.utils.backtest_tools import run_historical_backtest
+from langchain_core.messages import HumanMessage, ToolMessage
 
 
 def create_bear_researcher(llm):
@@ -34,6 +36,11 @@ Key points to focus on:
 - Bull Counterpoints: Critically analyze the bull argument with specific data and sound reasoning, exposing weaknesses or over-optimistic assumptions.
 - Engagement: Present your argument in a conversational style, directly engaging with the bull analyst's points and debating effectively rather than simply listing facts.
 
+CRITICAL INSTRUCTIONS FOR QUANTITATIVE THINKING:
+- You MUST use probabilistic language instead of absolute assertions. (e.g. "There is a 65% probability..." instead of "It will definitely...").
+- When you bring up a technical indicator, chart pattern, or market scenario (like a Death Cross, RSI overbought, etc.), you MUST use the `run_historical_backtest` tool to prove your point with historical data.
+- Do not make up statistics; use the tool to get real probabilities and average returns over the last 10 years.
+
 Resources available:
 
 {instrument_context}
@@ -46,7 +53,19 @@ Last bull argument: {current_response}
 Use this information to deliver a compelling bear argument, refute the bull's claims, and engage in a dynamic debate that demonstrates the risks and weaknesses of investing in the {target_label}.
 """ + get_language_instruction()
 
-        response = llm.invoke(prompt)
+        llm_with_tools = llm.bind_tools([run_historical_backtest])
+        messages = [HumanMessage(content=prompt)]
+        
+        while True:
+            response = llm_with_tools.invoke(messages)
+            if not response.tool_calls:
+                break
+            
+            messages.append(response)
+            for tool_call in response.tool_calls:
+                if tool_call["name"] == "run_historical_backtest":
+                    tool_res = run_historical_backtest.invoke(tool_call)
+                    messages.append(ToolMessage(content=str(tool_res), tool_call_id=tool_call["id"]))
 
         argument = f"Bear Analyst: {response.content}"
 
