@@ -30,17 +30,23 @@ from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from .symbol_utils import crypto_base
+from .symbol_utils import get_social_search_term
 
 logger = logging.getLogger(__name__)
 
 _API = "https://www.reddit.com/r/{sub}/search.json?{qs}"
 _RSS = "https://www.reddit.com/r/{sub}/search.rss?{qs}"
+
+import os
+_RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", "")
+_RAPIDAPI_HOST = "reddit34.p.rapidapi.com"
+_RAPIDAPI_URL = "https://reddit34.p.rapidapi.com/getSearchPosts"
+
 # A descriptive, identified User-Agent (per Reddit's API etiquette). Reddit
 # blocks generic/anonymous tokens like bare "Mozilla/5.0" or "curl/…" but
 # serves this one on both endpoints; the RSS feed accepts it even when the
 # JSON search endpoint 403s, so no browser-spoofing is needed.
-_UA = "tradingagents/0.2 (+https://github.com/TauricResearch/TradingAgents)"
+_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MyRedditRSSApp/1.0"
 _ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
 
 # Default subreddits ordered roughly by signal density for ticker-specific
@@ -131,6 +137,8 @@ def _fetch_subreddit_rss(
         title_el = entry.find("atom:title", _ATOM_NS)
         published_el = entry.find("atom:published", _ATOM_NS)
         content_el = entry.find("atom:content", _ATOM_NS)
+        link_el = entry.find("atom:link", _ATOM_NS)
+        url = link_el.attrib.get("href", "") if link_el is not None else ""
         posts.append({
             "title": (title_el.text if title_el is not None else "") or "",
             "score": None,
@@ -139,6 +147,7 @@ def _fetch_subreddit_rss(
                 published_el.text if published_el is not None else None
             ),
             "selftext": _strip_html(content_el.text if content_el is not None else ""),
+            "url": url,
             "source": "rss",
         })
     return posts
@@ -173,19 +182,78 @@ def _fetch_subreddit_json(
         return _fetch_subreddit_rss(ticker, sub, limit, timeout)
 
 
+def _fetch_subreddit_rapidapi(
+    ticker: str,
+    sub: str,
+    limit: int,
+    timeout: float,
+) -> list[dict]:
+    """Fetch one subreddit using RapidAPI.
+    
+    This replaces the blocked JSON endpoint and the metric-less RSS endpoint.
+    """
+    querystring = {
+        "query": ticker,
+        "subreddit": sub,
+        "sort": "top",
+        "time": "week"
+    }
+    qs = urlencode(querystring)
+    url = f"{_RAPIDAPI_URL}?{qs}"
+    
+    req = Request(url, headers={
+        "x-rapidapi-key": _RAPIDAPI_KEY,
+        "x-rapidapi-host": _RAPIDAPI_HOST,
+        "Accept": "application/json"
+    })
+    
+    try:
+        with urlopen(req, timeout=timeout) as resp:
+            payload = json.loads(resp.read())
+            
+        data_field = payload.get("data", {})
+        if not isinstance(data_field, dict):
+            logger.warning(
+                "RapidAPI unexpected structure for r/%s · %s: %s",
+                sub, ticker, payload
+            )
+            return []
+            
+        posts = data_field.get("posts", [])
+        
+        results = []
+        for p in posts[:limit]:
+            post_data = p.get("data", {})
+            results.append({
+                "title": post_data.get("title", ""),
+                "score": post_data.get("score"),
+                "num_comments": post_data.get("num_comments"),
+                "created_utc": post_data.get("created_utc"),
+                "selftext": _strip_html(post_data.get("selftext", "")),
+                "url": post_data.get("url", ""),
+                "source": "rapidapi"
+            })
+        return results
+        
+    except (OSError, http.client.HTTPException, json.JSONDecodeError) as exc:
+        logger.warning(
+            "Reddit RapidAPI fetch failed for r/%s · %s: %s — falling back to RSS feed.",
+            sub, ticker, exc,
+        )
+        return _fetch_subreddit_rss(ticker, sub, limit, timeout)
+
+
 def _fetch_subreddit(
     ticker: str,
     sub: str,
     limit: int,
     timeout: float,
 ) -> list[dict]:
-    """Fetch one subreddit, RSS-first.
-
-    The JSON search endpoint is reliably WAF-blocked (403) for public clients,
-    so we go straight to the RSS feed — which serves our identified User-Agent
-    reliably — halving our request volume against Reddit's per-IP rate limit.
+    """Fetch one subreddit.
+    
+    Delegates to RapidAPI to get full metrics, and falls back to RSS on failure.
     """
-    return _fetch_subreddit_rss(ticker, sub, limit, timeout)
+    return _fetch_subreddit_rapidapi(ticker, sub, limit, timeout)
 
 
 def fetch_reddit_posts(
@@ -193,7 +261,7 @@ def fetch_reddit_posts(
     subreddits: Iterable[str] = DEFAULT_SUBREDDITS,
     limit_per_sub: int = 5,
     timeout: float = 10.0,
-    inter_request_delay: float = 1.0,
+    inter_request_delay: float = 2.5,
 ) -> str:
     """Fetch recent Reddit posts mentioning ``ticker`` across finance
     subreddits and return them as a formatted plaintext block.
@@ -204,7 +272,8 @@ def fetch_reddit_posts(
     """
     # Crypto reaches us as a Yahoo pair (BTC-USD); search Reddit for the base
     # ("BTC") so the query actually matches discussion instead of near-nothing.
-    ticker = crypto_base(ticker) or ticker
+    # For commodities (e.g. XAGUSD), it maps to the common name (e.g. "Silver").
+    ticker = get_social_search_term(ticker)
     blocks = []
     total_posts = 0
     for i, sub in enumerate(subreddits):
@@ -236,8 +305,10 @@ def fetch_reddit_posts(
             selftext = (p.get("selftext") or "").replace("\n", " ").strip()
             if len(selftext) > 240:
                 selftext = selftext[:240] + "…"
+            url = p.get("url") or ""
+            url_str = f" [url: {url}]" if url else ""
             lines.append(
-                f"  [{meta}] {title}"
+                f"  [{meta}] {title}{url_str}"
                 + (f"\n    body excerpt: {selftext}" if selftext else "")
             )
         blocks.append("\n".join(lines))

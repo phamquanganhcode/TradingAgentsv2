@@ -19,23 +19,21 @@ import json
 import logging
 from urllib.request import Request, urlopen
 
-from .symbol_utils import crypto_base
+from .symbol_utils import get_stocktwits_symbol
 
 logger = logging.getLogger(__name__)
 
-_API = "https://api.stocktwits.com/api/2/streams/symbol/{ticker}.json"
-_UA = "tradingagents/0.2 (+https://github.com/TauricResearch/TradingAgents)"
+import os
+
+_API = "https://stocktwits.p.rapidapi.com/streams/symbol/{ticker}.json"
+_RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", "")
+_RAPIDAPI_HOST = "stocktwits.p.rapidapi.com"
+_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MyTradingAgent/1.0"
 
 
 def _stocktwits_symbol(ticker: str) -> str:
-    """Map a crypto pair to StockTwits' ``<BASE>.X`` convention.
-
-    StockTwits lists crypto as ``BTC.X`` (Yahoo's ``BTC-USD`` form 404s), so any
-    crypto symbol resolves to its base plus ``.X``; other symbols pass through
-    upper-cased.
-    """
-    base = crypto_base(ticker)
-    return f"{base}.X" if base else ticker.strip().upper()
+    """Map a symbol to StockTwits' convention."""
+    return get_stocktwits_symbol(ticker)
 
 
 def fetch_stocktwits_messages(ticker: str, limit: int = 30, timeout: float = 10.0) -> str:
@@ -47,7 +45,13 @@ def fetch_stocktwits_messages(ticker: str, limit: int = 30, timeout: float = 10.
     caller never has to special-case None or exceptions.
     """
     url = _API.format(ticker=_stocktwits_symbol(ticker))
-    req = Request(url, headers={"User-Agent": _UA, "Accept": "application/json"})
+    headers = {
+        "User-Agent": _UA, 
+        "Accept": "application/json",
+        "X-RapidAPI-Key": _RAPIDAPI_KEY,
+        "X-RapidAPI-Host": _RAPIDAPI_HOST
+    }
+    req = Request(url, headers=headers)
     try:
         with urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read())

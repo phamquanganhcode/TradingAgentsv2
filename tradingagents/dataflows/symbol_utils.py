@@ -141,3 +141,43 @@ def normalize_symbol(raw: str) -> str:
 def is_yahoo_safe(symbol: str) -> bool:
     """True when ``symbol`` only contains characters Yahoo symbols use."""
     return bool(symbol) and _YAHOO_SAFE.fullmatch(symbol) is not None
+
+_SOCIAL_TERMS = {
+    "XAGUSD": "Silver", "XAG": "Silver", "SILVER": "Silver", "SI=F": "Silver",
+    "XAUUSD": "Gold", "XAU": "Gold", "GOLD": "Gold", "GC=F": "Gold",
+    "WTICOUSD": "Oil", "USOIL": "Oil", "WTI": "Oil", "BCOUSD": "Brent", "UKOIL": "Brent", "CL=F": "Oil",
+    "NATGAS": "Natural Gas", "XNGUSD": "Natural Gas", "NG=F": "Natural Gas",
+    "COPPER": "Copper", "XCUUSD": "Copper", "HG=F": "Copper",
+}
+
+_STOCKTWITS_SYMBOLS = {
+    "XAGUSD": "SLV", "XAG": "SLV", "SILVER": "SLV", "SI=F": "SLV",
+    "XAUUSD": "GLD", "XAU": "GLD", "GOLD": "GLD", "GC=F": "GLD",
+    "WTICOUSD": "USO", "USOIL": "USO", "WTI": "USO", "CL=F": "USO",
+    "NATGAS": "UNG", "XNGUSD": "UNG", "NG=F": "UNG",
+    "COPPER": "CPER", "XCUUSD": "CPER", "HG=F": "CPER",
+}
+
+def get_social_search_term(raw: str) -> str:
+    """Map a broker symbol to a common word used on Reddit/Twitter."""
+    if not isinstance(raw, str) or not raw.strip():
+        return raw
+    s = raw.strip().upper().rstrip("+")
+    cbase = crypto_base(s)
+    if cbase:
+        return cbase
+    return _SOCIAL_TERMS.get(s, s)
+
+def get_stocktwits_symbol(raw: str) -> str:
+    """Map a broker symbol to a Stocktwits cashtag/symbol."""
+    if not isinstance(raw, str) or not raw.strip():
+        return raw
+    s = raw.strip().upper().rstrip("+")
+    cbase = crypto_base(s)
+    if cbase:
+        return f"{cbase}.X"
+    if s in _STOCKTWITS_SYMBOLS:
+        return _STOCKTWITS_SYMBOLS[s]
+    if len(s) == 6 and s[:3] in _FOREX_CURRENCIES and s[3:] in _FOREX_CURRENCIES:
+        return f"{s[:3]}{s[3:]}"
+    return s

@@ -65,6 +65,12 @@ MACRO_SERIES = {
     "money_supply": "M2SL",
     "vix": "VIXCLS",
     "dollar_index": "DTWEXBGS",
+    "dxy": "DTWEXBGS",
+    "real_yield_10y": "DFII10",
+    "real_yield_5y": "DFII5",
+    "real_yield_7y": "DFII7",
+    "real_yield_20y": "DFII20",
+    "real_yield_30y": "DFII30",
     # Sentiment & housing
     "consumer_sentiment": "UMCSENT",
     "housing_starts": "HOUST",
