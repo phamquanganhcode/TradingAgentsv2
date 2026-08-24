@@ -52,6 +52,20 @@ class AgentState(MessagesState):
 
     sender: Annotated[str, "Agent that sent this message"]
 
+    # ── Global market data snapshot ────────────────────────────────────────────
+    # Computed ONCE at pipeline start from the verified market data source.
+    # Contains current price, SMA-50, SMA-200, RSI, ATR, Bollinger bands, etc.
+    # as a pre-formatted text block.  ALL agents (analysts, trader, PM, debaters)
+    # MUST treat the numeric values in this field as the authoritative source of
+    # truth — they must never invent or recalculate price/indicator values that
+    # differ from what is stated here.
+    verified_market_snapshot: Annotated[
+        str,
+        "Single-source-of-truth market data snapshot (price, SMA-50, SMA-200, RSI, "
+        "ATR, Bollinger bands) fetched once at run start. Every agent reads from here; "
+        "none may generate conflicting numbers.",
+    ]
+
     # research step
     market_report: Annotated[str, "Report from the Market Analyst"]
     sentiment_report: Annotated[str, "Report from the Sentiment Analyst"]

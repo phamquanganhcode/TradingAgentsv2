@@ -21,6 +21,12 @@ from tradingagents.agents.utils.structured import (
     invoke_structured_or_freetext,
 )
 
+# ── Hard R/R gate thresholds ───────────────────────────────────────────────────
+# R/R below MINIMUM_RR_FOR_ENTRY → PM MUST reject Buy/Overweight and issue Hold.
+# R/R below ABSOLUTE_RR_FLOOR   → PM MUST NOT approve any directional trade at all.
+MINIMUM_RR_FOR_ENTRY = 1.5   # minimum acceptable R/R to enter a position
+ABSOLUTE_RR_FLOOR = 1.0      # below this: no Buy or Sell under any circumstances
+
 
 def create_portfolio_manager(llm):
     structured_llm = bind_structured(llm, PortfolioDecision, "Portfolio Manager")
@@ -40,10 +46,23 @@ def create_portfolio_manager(llm):
             else ""
         )
 
-        prompt = f"""As the Portfolio Manager, synthesize the risk analysts' debate and deliver the final trading decision.
+        # ── Global single-source-of-truth market data ──────────────────────────
+        # This snapshot was computed ONCE before any agent ran.
+        # It is the ONLY authoritative source for current price and indicators.
+        # Use ONLY these values when calculating R/R — never the ones mentioned
+        # in the debate history or trader plan if they differ.
+        verified_snapshot = state.get("verified_market_snapshot", "")
+        snapshot_section = (
+            f"\n\n---\n## AUTHORITATIVE MARKET DATA — USE ONLY THESE VALUES\n\n"
+            f"{verified_snapshot}\n---\n"
+            if verified_snapshot
+            else ""
+        )
+
+        prompt = f"""As the Portfolio Manager, your PRIMARY DUTY is capital preservation. Synthesize the risk analysts' debate and deliver the final trading decision.
 
 {instrument_context}
-
+{snapshot_section}
 ---
 
 **Rating Scale** (use exactly one):
@@ -52,9 +71,6 @@ def create_portfolio_manager(llm):
 - **Hold**: Maintain current position, wait for clearer signals
 - **Underweight**: Reduce exposure, take partial profits
 - **Sell**: Exit position or avoid entry completely
-
-**Position Sizing & Entry Strategy Guidelines:**
-Do not be rigidly binary (all-in or all-out). If the analysts propose a "Tiered Entry" or fractional position (e.g., entering 20-25% to probe), you MUST strongly consider and integrate flexible position sizing into your final decision. If the evidence warrants it, choose "Overweight" or "Buy" with a specific fractional allocation plan instead of defaulting to a passive "Hold".
 
 **Context:**
 - Research Manager's investment plan: **{research_plan}**
@@ -65,10 +81,42 @@ Do not be rigidly binary (all-in or all-out). If the analysts propose a "Tiered 
 
 ---
 
-Be decisive, avoid rigid binary logic when fractional allocation is smarter, and ground every conclusion in specific evidence from the analysts.
+**Mandatory R/R Calculation:**
+You MUST explicitly calculate and state the quantitative Risk/Reward ratio using ONLY the values in the AUTHORITATIVE MARKET DATA block above.
+Formula: R/R = (Price Target − Current Price) / (Current Price − Stop Loss)
+Show the exact values used and the final ratio in `risk_reward_calculation`.
 
-**Mandatory Calculation:**
-You MUST explicitly calculate the Risk/Reward ratio: R/R = (Price Target - Current Price) / (Current Price - Stop Loss). Fill the required fields and show the math in `risk_reward_calculation`.
+---
+
+**⛔ HARD RISK GATE — NON-NEGOTIABLE — READ CAREFULLY:**
+
+YOU ARE THE PORTFOLIO MANAGER. YOUR SUPREME DUTY IS CAPITAL PROTECTION.
+
+After calculating the R/R ratio:
+
+1. **If R/R < {ABSOLUTE_RR_FLOOR} (reward is less than risk):**
+   - You are ABSOLUTELY FORBIDDEN from assigning Buy, Overweight, or Sell.
+   - You MUST assign **Hold** or **Underweight**.
+   - You MUST explain two alternative entry scenarios with better R/R:
+     * Scenario A: Entry after breakout above resistance (calculate new R/R)
+     * Scenario B: Entry after pullback to support (calculate new R/R)
+
+2. **If {ABSOLUTE_RR_FLOOR} ≤ R/R < {MINIMUM_RR_FOR_ENTRY} (reward does not meet minimum threshold):**
+   - You MUST NOT assign Buy or Overweight.
+   - You MUST assign **Hold**, **Underweight**, or **Sell**.
+   - You MUST explain the specific R/R that would justify re-entry.
+
+3. **If the Trader's proposal is HOLD due to poor R/R:**
+   - You MUST RESPECT this signal. The Trader's caution is a disciplined, correct decision.
+   - You may only override it if you have CONCRETE evidence from the risk debate that
+     the R/R has materially improved — and you must show the updated R/R math.
+
+4. **If R/R ≥ {MINIMUM_RR_FOR_ENTRY}:**
+   - You may assign any rating (Buy / Overweight / Hold / Underweight / Sell) based
+     on the debate quality and conviction level.
+
+Be decisive and ground every conclusion in specific evidence. Position sizing is smart
+only when the R/R gate is satisfied — fractional sizing does NOT waive the R/R requirement.
 
 {NO_EXTERNAL_TOOLS}{get_language_instruction()}"""
 
@@ -99,3 +147,4 @@ You MUST explicitly calculate the Risk/Reward ratio: R/R = (Price Target - Curre
         }
 
     return portfolio_manager_node
+

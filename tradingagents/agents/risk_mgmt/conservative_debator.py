@@ -19,6 +19,15 @@ def create_conservative_debator(llm):
         fundamentals_report = state["fundamentals_report"]
         instrument_context = get_instrument_context_from_state(state)
 
+        # ── Global single-source-of-truth market data ──────────────────────────
+        verified_snapshot = state.get("verified_market_snapshot", "")
+        snapshot_block = (
+            f"\n\nAUTHORITATIVE MARKET DATA (these are the only correct price/indicator values — "
+            f"do not use or invent different numbers in your argument):\n{verified_snapshot}\n"
+            if verified_snapshot
+            else ""
+        )
+
         trader_decision = state["trader_investment_plan"]
 
         prompt = f"""As the Conservative Risk Analyst, your primary objective is to protect assets, minimize volatility, and ensure steady, reliable growth. You prioritize stability, security, and risk mitigation, carefully assessing potential losses, economic downturns, and market volatility. When evaluating the trader's decision or plan, critically examine high-risk elements, pointing out where the decision may expose the firm to undue risk and where more cautious alternatives could secure long-term gains. Here is the trader's decision:
@@ -26,7 +35,7 @@ def create_conservative_debator(llm):
 {trader_decision}
 
 Your task is to actively counter the arguments of the Aggressive and Neutral Analysts, highlighting where their views may overlook potential threats or fail to prioritize sustainability. Respond directly to their points, drawing from the following data sources to build a convincing case for a low-risk approach adjustment to the trader's decision:
-
+{snapshot_block}
 {instrument_context}
 Market Research Report: {market_research_report}
 Social Media Sentiment Report: {sentiment_report}
@@ -34,7 +43,12 @@ Latest World Affairs Report: {news_report}
 Company Fundamentals Report: {fundamentals_report}
 Here is the current conversation history: {history} Here is the last response from the aggressive analyst: {current_aggressive_response} Here is the last response from the neutral analyst: {current_neutral_response}. If there are no responses from the other viewpoints yet, present your own argument based on the available data.
 
-Engage by questioning their optimism and emphasizing the potential downsides they may have overlooked. Address each of their counterpoints to showcase why a conservative stance is ultimately the safest path for the firm's assets. Focus on debating and critiquing their arguments to demonstrate the strength of a low-risk strategy over their approaches. Output conversationally as if you are speaking without any special formatting.""" + get_language_instruction()
+Engage by questioning their optimism and emphasizing the potential downsides they may have overlooked. Address each of their counterpoints to showcase why a conservative stance is ultimately the safest path for the firm's assets. Focus on debating and critiquing their arguments to demonstrate the strength of a low-risk strategy over their approaches.
+
+DATA INTEGRITY: Any price, SMA, RSI, or indicator value you cite MUST come from the AUTHORITATIVE MARKET DATA block above. Do not invent or use different numbers.
+PENALTY: Do not simply repeat the exact same numbers (e.g., SMA, RSI, ATR values) that have already been mentioned in previous rounds. Doing so will result in a penalty. Bring new perspectives, analyze different metrics, or synthesize the existing data into a new argument.
+
+Output conversationally as if you are speaking without any special formatting.""" + get_language_instruction()
 
         response = llm.invoke(prompt)
 

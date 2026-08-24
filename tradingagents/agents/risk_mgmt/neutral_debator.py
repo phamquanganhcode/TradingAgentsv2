@@ -19,6 +19,15 @@ def create_neutral_debator(llm):
         fundamentals_report = state["fundamentals_report"]
         instrument_context = get_instrument_context_from_state(state)
 
+        # ── Global single-source-of-truth market data ──────────────────────────
+        verified_snapshot = state.get("verified_market_snapshot", "")
+        snapshot_block = (
+            f"\n\nAUTHORITATIVE MARKET DATA (these are the only correct price/indicator values — "
+            f"do not use or invent different numbers in your argument):\n{verified_snapshot}\n"
+            if verified_snapshot
+            else ""
+        )
+
         trader_decision = state["trader_investment_plan"]
 
         prompt = f"""As the Neutral Risk Analyst, your role is to provide a balanced perspective, weighing both the potential benefits and risks of the trader's decision or plan. You prioritize a well-rounded approach, evaluating the upsides and downsides while factoring in broader market trends, potential economic shifts, and diversification strategies.Here is the trader's decision:
@@ -26,7 +35,7 @@ def create_neutral_debator(llm):
 {trader_decision}
 
 Your task is to challenge both the Aggressive and Conservative Analysts, pointing out where each perspective may be overly optimistic or overly cautious. Use insights from the following data sources to support a moderate, sustainable strategy to adjust the trader's decision:
-
+{snapshot_block}
 {instrument_context}
 Market Research Report: {market_research_report}
 Social Media Sentiment Report: {sentiment_report}
@@ -34,7 +43,12 @@ Latest World Affairs Report: {news_report}
 Company Fundamentals Report: {fundamentals_report}
 Here is the current conversation history: {history} Here is the last response from the aggressive analyst: {current_aggressive_response} Here is the last response from the conservative analyst: {current_conservative_response}. If there are no responses from the other viewpoints yet, present your own argument based on the available data.
 
-Engage actively by analyzing both sides critically, addressing weaknesses in the aggressive and conservative arguments to advocate for a more balanced approach. Challenge each of their points to illustrate why a moderate risk strategy might offer the best of both worlds, providing growth potential while safeguarding against extreme volatility. Focus on debating rather than simply presenting data, aiming to show that a balanced view can lead to the most reliable outcomes. Output conversationally as if you are speaking without any special formatting.""" + get_language_instruction()
+Engage actively by analyzing both sides critically, addressing weaknesses in the aggressive and conservative arguments to advocate for a more balanced approach. Challenge each of their points to illustrate why a moderate risk strategy might offer the best of both worlds, providing growth potential while safeguarding against extreme volatility. Focus on debating rather than simply presenting data, aiming to show that a balanced view can lead to the most reliable outcomes.
+
+DATA INTEGRITY: Any price, SMA, RSI, or indicator value you cite MUST come from the AUTHORITATIVE MARKET DATA block above. Do not invent or use different numbers.
+PENALTY: Do not simply repeat the exact same numbers (e.g., SMA, RSI, ATR values) that have already been mentioned in previous rounds. Doing so will result in a penalty. Bring new perspectives, analyze different metrics, or synthesize the existing data into a new argument.
+
+Output conversationally as if you are speaking without any special formatting.""" + get_language_instruction()
 
         response = llm.invoke(prompt)
 

@@ -16,6 +16,13 @@ def create_fundamentals_analyst(llm):
         current_date = state["trade_date"]
         instrument_context = get_instrument_context_from_state(state)
 
+        # ── Global single-source-of-truth price & indicator data ──────────────
+        # This snapshot was computed ONCE at pipeline start and shared across
+        # all agents.  The fundamentals analyst does NOT have technical-indicator
+        # tools, so it MUST NOT invent price, SMA, RSI, or MA values.  Any
+        # technical reference must be copied verbatim from this snapshot.
+        verified_snapshot = state.get("verified_market_snapshot", "")
+
         tools = [
             get_fundamentals,
             get_balance_sheet,
@@ -29,7 +36,15 @@ def create_fundamentals_analyst(llm):
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
             + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements."
             + " CRITICAL INSTRUCTION: If the asset is a Commodity (e.g. Silver, Gold, Oil) or Forex, it does NOT have financial statements. YOU MUST CALL `get_macro_indicators` to fetch macroeconomic data like `real_yield_10y`, `dxy`, and general market conditions. You are forbidden from omitting exact numbers from `get_macro_indicators`."
-            + get_language_instruction(),
+            + "\n\n"
+            + "MANDATORY DATA INTEGRITY RULE — TECHNICAL INDICATORS:\n"
+            + "You do NOT have access to technical indicator tools (no `get_indicators`, no `get_stock_data`, no `get_verified_market_snapshot`). "
+            + "You are STRICTLY FORBIDDEN from generating or reporting any values for: current price, SMA-50, SMA-200, EMA, RSI, MACD, Bollinger Bands, ATR, or any other technical indicator. "
+            + "If you need to reference any such value, you MUST copy it verbatim from the VERIFIED MARKET DATA SNAPSHOT below — do NOT paraphrase or recalculate. "
+            + "Reporting a number that is not in the snapshot is a critical error.\n\n"
+            + "VERIFIED MARKET DATA SNAPSHOT (authoritative — do not contradict):\n"
+            + (verified_snapshot if verified_snapshot else "[Snapshot unavailable — do not report any price or indicator values]")
+            + get_language_instruction()
         )
 
         prompt = ChatPromptTemplate.from_messages(
@@ -70,3 +85,4 @@ def create_fundamentals_analyst(llm):
         }
 
     return fundamentals_analyst_node
+

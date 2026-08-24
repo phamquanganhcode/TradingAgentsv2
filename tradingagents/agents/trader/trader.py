@@ -26,6 +26,18 @@ def create_trader(llm):
         instrument_context = get_instrument_context_from_state(state)
         investment_plan = state["investment_plan"]
 
+        # ── Global single-source-of-truth market data ──────────────────────────
+        # This snapshot was computed ONCE before any agent ran. Every price,
+        # SMA, RSI, and ATR value you use MUST come from here. If a value in
+        # the investment plan contradicts this snapshot, trust the snapshot.
+        verified_snapshot = state.get("verified_market_snapshot", "")
+        snapshot_section = (
+            f"\n\n---\n## AUTHORITATIVE MARKET DATA (use these exact values — do not substitute)\n\n"
+            f"{verified_snapshot}\n---"
+            if verified_snapshot
+            else ""
+        )
+
         messages = [
             {
                 "role": "system",
@@ -33,7 +45,14 @@ def create_trader(llm):
                     "You are a trading agent analyzing market data to make investment decisions. "
                     "Based on your analysis, provide a specific recommendation to buy, sell, or hold. "
                     "Anchor your reasoning in the analysts' reports and the research plan. "
-                    "You MUST explicitly calculate the Risk/Reward ratio: R/R = (Price Target - Current Price) / (Current Price - Stop Loss). Show the math in `risk_reward_calculation`.\n"
+                    "\n\n"
+                    "PRICE DATA INTEGRITY RULE: The AUTHORITATIVE MARKET DATA block in the user message "
+                    "is the single source of truth for current price, SMA-50, SMA-200, and all indicator values. "
+                    "Use ONLY those exact numbers in your calculations. If the research plan mentions a different "
+                    "current price, flag the discrepancy and use the authoritative snapshot value.\n\n"
+                    "You MUST explicitly calculate and state the quantitative Risk/Reward ratio (e.g., 1:2 or 1:0.5). Do not just say 'unfavorable' without providing the specific ratio and the exact numbers used in the calculation: R/R = (Price Target - Current Price) / (Current Price - Stop Loss). "
+                    "CRITICAL RULE: If the current price is too close to resistance causing the R/R ratio to be < 1:2, you MUST automatically propose 2 alternative scenarios: Scenario 1 (Wait for price to break out above resistance to buy) and Scenario 2 (Wait for price to correct to support to buy). Calculate the R/R for both of these alternative scenarios. Show the math and these scenarios in `risk_reward_calculation`.\n"
+                    "NOTE: A HOLD recommendation when R/R < 1:2 is a disciplined, correct decision — it is NOT passive. It protects capital until a better entry with ≥ 1:2 R/R is available.\n"
                     + NO_EXTERNAL_TOOLS
                     + get_language_instruction()
                 ),
@@ -47,6 +66,7 @@ def create_trader(llm):
                     f"social media sentiment. Use this plan as a foundation for evaluating your next "
                     f"trading decision.\n\nProposed Investment Plan: {investment_plan}\n\n"
                     f"Leverage these insights to make an informed and strategic decision."
+                    f"{snapshot_section}"
                 ),
             },
         ]
@@ -66,3 +86,4 @@ def create_trader(llm):
         }
 
     return functools.partial(trader_node, name="Trader")
+
