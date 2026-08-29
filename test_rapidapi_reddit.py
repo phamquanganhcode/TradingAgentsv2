@@ -6,7 +6,7 @@ import requests
 import json
 from datetime import datetime
 
-API_KEY = "cb242054e0msh1407856d05d8875p19dd35jsn24900bddcd81"
+API_KEY = "15d9a4a831mshcd17b4b0b041f18p1a7817jsn623bc5947cdd"
 HOST = "reddit34.p.rapidapi.com"
 URL = "https://reddit34.p.rapidapi.com/getSearchPosts"
 

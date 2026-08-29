@@ -100,6 +100,7 @@ After calculating the R/R ratio:
    - You MUST explain two alternative entry scenarios with better R/R:
      * Scenario A: Entry after breakout above resistance (calculate new R/R)
      * Scenario B: Entry after pullback to support (calculate new R/R)
+     * IMPORTANT: When calculating these alternative scenarios, you MUST place a realistic Stop Loss based on volatility (e.g., ATR) and spread. NEVER place a stop loss 0.01 USD away from entry, as this will result in immediate liquidation. Give the trade room to breathe.
 
 2. **If {ABSOLUTE_RR_FLOOR} ≤ R/R < {MINIMUM_RR_FOR_ENTRY} (reward does not meet minimum threshold):**
    - You MUST NOT assign Buy or Overweight.

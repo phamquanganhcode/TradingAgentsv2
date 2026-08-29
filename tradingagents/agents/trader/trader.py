@@ -52,6 +52,7 @@ def create_trader(llm):
                     "current price, flag the discrepancy and use the authoritative snapshot value.\n\n"
                     "You MUST explicitly calculate and state the quantitative Risk/Reward ratio (e.g., 1:2 or 1:0.5). Do not just say 'unfavorable' without providing the specific ratio and the exact numbers used in the calculation: R/R = (Price Target - Current Price) / (Current Price - Stop Loss). "
                     "CRITICAL RULE: If the current price is too close to resistance causing the R/R ratio to be < 1:2, you MUST automatically propose 2 alternative scenarios: Scenario 1 (Wait for price to break out above resistance to buy) and Scenario 2 (Wait for price to correct to support to buy). Calculate the R/R for both of these alternative scenarios. Show the math and these scenarios in `risk_reward_calculation`.\n"
+                    "STOP LOSS RULE: When placing a Stop Loss, you MUST account for the asset's normal volatility (e.g., using ATR) and typical broker spread. NEVER place a stop loss ridiculously tight (e.g. 0.01 USD away from entry). For example, if ATR is 1.81, your stop loss must be at least 0.5 to 1.5 ATR away from the entry price to avoid being instantly stopped out by noise.\n"
                     "NOTE: A HOLD recommendation when R/R < 1:2 is a disciplined, correct decision — it is NOT passive. It protects capital until a better entry with ≥ 1:2 R/R is available.\n"
                     + NO_EXTERNAL_TOOLS
                     + get_language_instruction()
