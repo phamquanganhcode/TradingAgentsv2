@@ -96,6 +96,10 @@ def write_report_tree(final_state: dict, ticker: str, save_path) -> Path:
             sections.append(f"## V. Portfolio Manager Decision\n\n### Portfolio Manager\n{risk['judge_decision']}")
 
     # Write consolidated report
+    # Use the folder name (e.g. XAGUSD_20260911_213836) as the file suffix
+    # so the filename always matches the directory that contains it.
+    folder_name = save_path.name  # e.g. "XAGUSD_20260911_213836"
+    report_filename = f"complete_report_{folder_name}.md"
     header = f"# Trading Analysis Report: {ticker}\n\nGenerated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-    (save_path / "complete_report.md").write_text(header + "\n\n".join(sections), encoding="utf-8")
-    return save_path / "complete_report.md"
+    (save_path / report_filename).write_text(header + "\n\n".join(sections), encoding="utf-8")
+    return save_path / report_filename

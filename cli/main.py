@@ -495,12 +495,14 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
 def get_user_selections():
     """Get all user selections before starting the analysis display."""
     if os.environ.get("AUTO_RUN"):
-        from cli.utils import detect_asset_type
         from cli.models import AnalystType
-        console.print("[green]Running in AUTO_RUN mode with predefined settings for XAGUSD...[/green]")
+        # AUTO_RUN_TICKER lets each .bat file target a different symbol.
+        # Falls back to XAGUSD when not set (backward compatible).
+        auto_ticker = os.environ.get("AUTO_RUN_TICKER", "XAGUSD").strip().upper()
+        console.print(f"[green]Running in AUTO_RUN mode with predefined settings for {auto_ticker}...[/green]")
         return {
-            "ticker": "XAGUSD",
-            "asset_type": detect_asset_type("XAGUSD").value,
+            "ticker": auto_ticker,
+            "asset_type": detect_asset_type(auto_ticker).value,
             "analysis_date": datetime.datetime.now().strftime("%Y-%m-%d"),
             "analysts": [AnalystType.MARKET, AnalystType.SOCIAL, AnalystType.NEWS, AnalystType.FUNDAMENTALS],
             "research_depth": 5,
